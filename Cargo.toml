@@ -1,0 +1,42 @@
+[package]
+name = "rwebman"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "A private, single-binary file finder and web terminal"
+
+[dependencies]
+anyhow = "1"
+argon2 = "0.5"
+axum = { version = "0.8", features = ["ws"] }
+axum-server = { version = "0.7", features = ["tls-rustls-no-provider"] }
+clap = { version = "4", features = ["derive"] }
+directories = "6"
+fs2 = "0.4"
+futures-util = "0.3"
+portable-pty = "0.9"
+rand = "0.8"
+rpassword = "7"
+rusqlite = { version = "0.37", features = ["bundled", "hooks"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+walkdir = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
+[dev-dependencies]
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }
+tokio-tungstenite = "0.29"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
