@@ -3,7 +3,8 @@ const $ = (id) => document.getElementById(id);
 const state = { csrf: null, view: 'search', kind: '', offset: 0, hasMore: false, query: '', searched: false, searchVersion: 0, controller: null, status: null, settingsLoaded: false, term: null, fit: null, socket: null, terminalGeneration: 0, polling: false };
 const typeNames = { file: '文件', directory: '文件夹', symlink: '链接' };
 const number = new Intl.NumberFormat('zh-CN');
-let toastTimer, searchTimer;
+let toastTimer, searchTimer, terminalFitFrame, terminalFitSettledFrame;
+let terminalFollowingOutput = true, terminalResizing = false;
 
 function icon(name, className = '') {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -30,6 +31,7 @@ function lock() {
   state.csrf = null; state.settingsLoaded = false; state.status = null;
   state.searchVersion++; state.controller?.abort(); clearTimeout(searchTimer);
   disconnectTerminal(true);
+  document.body.classList.remove('terminal-view');
   $('workspace').hidden = true; $('login-screen').hidden = false;
   $('results').replaceChildren(); $('query').value = ''; $('roots').value = ''; $('excludes').value = '';
   state.searched = false; state.offset = 0; state.query = '';
@@ -63,6 +65,7 @@ $('logout').addEventListener('click', async () => {
 function showView(name) {
   if (!state.csrf) return;
   state.view = name;
+  document.body.classList.toggle('terminal-view', name === 'terminal');
   for (const view of ['search', 'terminal', 'settings']) $(`view-${view}`).hidden = view !== name;
   document.querySelectorAll('.nav-item[data-view]').forEach(button => {
     button.classList.toggle('active', button.dataset.view === name);
@@ -70,7 +73,7 @@ function showView(name) {
   });
   $('view-title').textContent = { search: '文件查找', terminal: '本地终端', settings: '索引设置' }[name];
   if (name === 'settings' && !state.settingsLoaded) loadSettings();
-  if (name === 'terminal' && state.term) requestAnimationFrame(() => { state.fit.fit(); state.term.focus(); });
+  if (name === 'terminal' && state.term) { scheduleTerminalFit(); state.term.focus(); }
 }
 document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
 document.addEventListener('keydown', (event) => {
@@ -221,11 +224,33 @@ $('settings-form').addEventListener('submit', async (event) => {
   finally { button.disabled = false; }
 });
 
+function fitTerminal() {
+  const term = state.term;
+  if (!term || !state.fit || state.view !== 'terminal' || !state.csrf
+      || !$('terminal').clientWidth || !$('terminal').clientHeight) return;
+  // Keep the prompt visible on resize without pulling a reader out of scrollback.
+  terminalResizing = true;
+  state.fit.fit();
+  if (terminalFollowingOutput) term.scrollToBottom();
+  cancelAnimationFrame(terminalFitSettledFrame);
+  terminalFitSettledFrame = requestAnimationFrame(() => {
+    if (term === state.term && terminalFollowingOutput) term.scrollToBottom();
+    terminalResizing = false;
+  });
+}
+function scheduleTerminalFit() {
+  if (!state.term || state.view !== 'terminal') return;
+  terminalResizing = true;
+  cancelAnimationFrame(terminalFitFrame);
+  terminalFitFrame = requestAnimationFrame(fitTerminal);
+}
 function disconnectTerminal(dispose = false) {
+  cancelAnimationFrame(terminalFitFrame); cancelAnimationFrame(terminalFitSettledFrame);
+  terminalResizing = false;
   state.terminalGeneration++;
   if (state.socket) { state.socket.onclose = null; state.socket.close(); state.socket = null; }
   $('terminal-status').textContent = '已断开'; $('terminal-disconnect').hidden = true;
-  $('terminal-connect').disabled = false; $('terminal-connect').querySelector('span').textContent = '启动终端';
+  $('terminal-connect').disabled = false; $('terminal-connect').hidden = false; $('terminal-connect').querySelector('span').textContent = '启动终端';
   if (dispose && state.term) { state.term.dispose(); state.term = null; state.fit = null; $('terminal').replaceChildren(); $('terminal').hidden = true; $('terminal-placeholder').hidden = false; }
   else if (state.term) state.term.writeln('\r\n\x1b[90m[会话已断开]\x1b[0m');
 }
@@ -241,15 +266,21 @@ function connectTerminal() {
   const generation = ++state.terminalGeneration;
   $('terminal-placeholder').hidden = true; $('terminal').hidden = false;
   const term = new Terminal({ cursorBlink: true, fontFamily: 'Consolas, "SFMono-Regular", Menlo, monospace', fontSize: 13, lineHeight: 1.2, scrollback: 5000, theme: { background: '#17231e', foreground: '#d3deca', cursor: '#bad99e', selectionBackground: '#426344', black: '#22352b', red: '#d59183', green: '#b3d297', yellow: '#d8c28d', blue: '#9abed5', magenta: '#c4a9ca', cyan: '#97c9bf', white: '#e0e7da' } });
-  const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open($('terminal')); fit.fit();
+  const fit = new FitAddon.FitAddon(); term.loadAddon(fit); term.open($('terminal'));
   state.term = term; state.fit = fit;
+  terminalFollowingOutput = true;
+  term.onScroll(() => {
+    if (!terminalResizing) terminalFollowingOutput = term.buffer.active.viewportY >= term.buffer.active.baseY;
+  });
+  fitTerminal();
+  document.fonts.ready.then(scheduleTerminalFit);
   $('terminal-connect').disabled = true; $('terminal-status').textContent = '正在连接…';
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/terminal`, ['rwebman', `csrf.${state.csrf}`]);
   state.socket = socket; socket.binaryType = 'arraybuffer';
   socket.onopen = () => {
     if (generation !== state.terminalGeneration) { socket.close(); return; }
-    $('terminal-status').textContent = '已连接'; $('terminal-disconnect').hidden = false;
-    fit.fit(); sendTerminal({ type: 'resize', cols: term.cols, rows: term.rows }); term.focus();
+    $('terminal-status').textContent = '已连接'; $('terminal-disconnect').hidden = false; $('terminal-connect').hidden = true;
+    fitTerminal(); sendTerminal({ type: 'resize', cols: term.cols, rows: term.rows }); term.focus();
   };
   socket.onmessage = event => {
     if (generation !== state.terminalGeneration) return;
@@ -260,6 +291,8 @@ function connectTerminal() {
   socket.onerror = () => { if (generation === state.terminalGeneration) toast('无法连接终端，请检查登录状态与终端连接数'); };
   socket.onclose = () => { if (generation === state.terminalGeneration) { disconnectTerminal(); pollStatus(); } };
   term.onData(data => {
+    terminalFollowingOutput = true;
+    term.scrollToBottom();
     // Small chunks keep PTY input bounded, including paste events.
     const chunks = []; let chunk = '', bytes = 0;
     for (const character of data) {
@@ -275,7 +308,9 @@ function connectTerminal() {
 }
 $('terminal-connect').addEventListener('click', connectTerminal);
 $('terminal-disconnect').addEventListener('click', () => disconnectTerminal());
-new ResizeObserver(() => { if (state.term && state.view === 'terminal') state.fit.fit(); }).observe($('terminal'));
+new ResizeObserver(scheduleTerminalFit).observe($('terminal'));
+window.addEventListener('resize', scheduleTerminalFit);
+window.visualViewport?.addEventListener('resize', scheduleTerminalFit);
 window.addEventListener('pagehide', () => disconnectTerminal(true));
 window.addEventListener('pageshow', event => { if (event.persisted) api('/api/session').then(data => unlock(data.csrf)).catch(() => lock()); });
 api('/api/session').then(data => unlock(data.csrf)).catch(() => {});

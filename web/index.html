@@ -46,7 +46,23 @@
       <div class="results-panel"><div id="empty-state" class="empty-state"><span class="empty-icon"><svg><use href="#i-search"/></svg></span><h3 id="empty-title">你要找的，就在这台电脑上。</h3><p id="empty-description">输入文件名开始查找，支持中文与部分名称匹配。</p><span class="empty-tip">按 <kbd>/</kbd> 或 <kbd>Ctrl K</kbd> 开始搜索</span></div><div id="results-table-wrap" class="table-scroll" hidden><table><thead><tr><th>名称 / 路径</th><th>类型</th><th>大小</th><th>修改时间</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="results"></tbody></table></div><div id="pagination" class="pagination" hidden><span id="page-label"></span><div><button id="previous" class="button secondary compact">上一页</button><button id="next" class="button secondary compact">下一页</button></div></div></div>
       <footer class="page-footer"><span><span class="tiny-dot"></span>只索引名称与元数据，不读取文件内容</span><span>为你的本地文件而建</span></footer>
     </section>
-    <section id="view-terminal" class="view" hidden><div class="page-heading"><div><span class="eyebrow">AT YOUR COMMAND</span><h1>熟悉的 Shell，新的入口。</h1><p class="muted">在浏览器中使用这台电脑的交互式终端。</p></div><button id="terminal-connect" class="button primary"><svg><use href="#i-terminal"/></svg><span>启动终端</span></button></div><div class="terminal-panel"><div class="terminal-toolbar"><div class="terminal-dots"><i></i><i></i><i></i></div><span id="shell-name">Local shell</span><span id="terminal-status" class="terminal-status">未连接</span><button id="terminal-disconnect" class="terminal-disconnect" hidden>断开</button></div><div id="terminal-placeholder" class="terminal-placeholder"><svg><use href="#i-terminal"/></svg><h2>准备好，开始工作。</h2><p>点击「启动终端」开启一个新的 Shell 会话。</p><span>支持彩色输出、交互程序、复制粘贴与窗口缩放</span></div><div id="terminal" hidden></div></div><p class="terminal-hint"><svg><use href="#i-lock"/></svg>终端以程序当前用户权限运行。断开连接或锁定工作空间会结束此 Shell；已主动脱离会话的后台任务可能继续运行。</p></section>
+    <section id="view-terminal" class="view" hidden>
+      <div class="terminal-panel">
+        <div class="terminal-toolbar">
+          <svg class="terminal-toolbar-icon" aria-hidden="true"><use href="#i-terminal"/></svg>
+          <h1 class="terminal-title">本地终端</h1>
+          <span id="shell-name">Local shell</span>
+          <span id="terminal-status" class="terminal-status">未连接</span>
+          <button id="terminal-connect" class="terminal-action"><svg><use href="#i-terminal"/></svg><span>启动终端</span></button>
+          <button id="terminal-disconnect" class="terminal-action" hidden>断开</button>
+          <details class="terminal-help"><summary aria-label="终端会话说明"><svg><use href="#i-lock"/></svg></summary><p>终端以程序当前用户权限运行。断开连接或锁定工作空间会结束此 Shell；已主动脱离会话的后台任务可能继续运行。</p></details>
+        </div>
+        <div class="terminal-content">
+          <div id="terminal-placeholder" class="terminal-placeholder"><svg><use href="#i-terminal"/></svg><h2>准备好，开始工作。</h2><p>点击「启动终端」开启一个新的 Shell 会话。</p><span>支持彩色输出、交互程序、复制粘贴与窗口缩放</span></div>
+          <div id="terminal" hidden></div>
+        </div>
+      </div>
+    </section>
     <section id="view-settings" class="view" hidden><div class="page-heading"><div><span class="eyebrow">MAKE IT YOURS</span><h1>把需要的文件，纳入视野。</h1><p class="muted">根据系统自动选择起点，也可以按你的习惯调整。</p></div></div><form id="settings-form"><div class="settings-card"><div class="settings-intro"><span class="settings-icon"><svg><use href="#i-folder"/></svg></span><h2>索引目录</h2><p>每行一个绝对路径。<br>子目录会自动包含在内，符号链接不会被递归跟随。</p></div><div class="settings-fields"><label for="roots">文件夹或驱动器</label><textarea id="roots" rows="6" spellcheck="false" required></textarea><p class="field-help">例如 Windows 的 D:\ 或 Linux / macOS 的 /home、/Users。网络与移动磁盘可手动添加。</p></div></div><div class="settings-card"><div class="settings-intro"><span class="settings-icon"><svg><use href="#i-sliders"/></svg></span><h2>排除与更新</h2><p>减少不必要的扫描，<br>让索引保持轻盈。</p></div><div class="settings-fields"><label for="excludes">排除项 <span>· 每行一个</span></label><textarea id="excludes" rows="7" spellcheck="false"></textarea><p class="field-help">填写文件 / 目录名称，或完整绝对路径。不使用通配符。程序数据目录始终排除。</p><label for="interval" class="interval-label">自动更新间隔</label><div class="interval-field"><input id="interval" type="number" min="0" max="43200" required><span>分钟</span></div><p id="interval-help" class="field-help">设为 0 时只在启动时索引，也可以手动更新。</p></div></div><div class="settings-actions"><p id="settings-error" class="error-text" role="alert"></p><span class="muted small">保存后将重新建立索引。</span><button class="button primary" type="submit">保存并更新索引 <svg><use href="#i-arrow"/></svg></button></div></form></section>
   </main></div>
 </div><div id="toast" class="toast" role="status" hidden></div>
